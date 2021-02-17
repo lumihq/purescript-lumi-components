@@ -27,7 +27,7 @@ import Control.Parallel (parTraverse)
 import Data.Array as Array
 import Data.Array.ST as STArray
 import Data.Either (Either(..), either)
-import Data.Foldable (foldMap, for_, traverse_)
+import Data.Foldable (fold, foldMap, for_, traverse_)
 import Data.Int (toNumber)
 import Data.Int as Int
 import Data.Map as Map
@@ -52,6 +52,7 @@ import Lumi.Components.Color (colors)
 import Lumi.Components.FetchCache as FetchCache
 import Lumi.Components.Icon (IconType(..), icon_)
 import Lumi.Components.Progress (progressBar, progressCircle, progressDefaults)
+import Lumi.Components.Spacing (Space(..), hspace)
 import Lumi.Components.Svg (userSvg)
 import Lumi.Components.Text (body_, nbsp)
 import React.Basic.Classic (Component, JSX, createComponent, element, elementKeyed, empty, fragment, make, readProps)
@@ -122,6 +123,7 @@ type UploadProps =
   , testId :: Nullable String
   , value :: Array FileId
   , variant :: UploadVariant
+  , fileUI :: Maybe (FileId -> JSX)
   }
 
 type UploadBackend =
@@ -163,6 +165,7 @@ defaults =
   , testId: toNullable Nothing
   , value: []
   , variant: Files
+  , fileUI: Nothing
   }
 
 getPreviewUri :: File -> Effect (Maybe URI)
@@ -479,12 +482,17 @@ upload = make component { initialState, render }
                                 }
                             , if stuff.readonly || value.readonly
                                 then empty
-                                else
-                                  lumiUploadFileRemove
-                                    { onClick: capture_ $ send self $ RemoveCompleteFile value.id
-                                    , children: icon_ Bin
-                                    , style: R.css {}
-                                    }
+                                else fragment
+                                  [ fold do
+                                      ui <- self.props.fileUI
+                                      pure $ ui value.id
+                                  , hspace S8
+                                  , lumiUploadFileRemove
+                                      { onClick: capture_ $ send self $ RemoveCompleteFile value.id
+                                      , children: icon_ Bin
+                                      , style: R.css {}
+                                      }
+                                  ]
                             ]
                         }
                   )
