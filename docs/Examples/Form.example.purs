@@ -445,6 +445,7 @@ userForm = ado
                   , name: Upload.FileName "avatar"
                   , previewUri: Nothing
                   , readonly: false
+                  , type_: Nothing
                   }
             , remove: \_ -> pure true
             , upload: \file -> produceAff \emitter -> do

@@ -47,17 +47,22 @@ import Effect.Unsafe (unsafePerformEffect)
 import Foreign (readNumber, unsafeToForeign)
 import Foreign.Index (readProp)
 import JSS (JSS, jss)
+import Lumi.Components (($$$))
 import Lumi.Components.Button (button, linkStyle)
 import Lumi.Components.Color (colors)
 import Lumi.Components.FetchCache as FetchCache
 import Lumi.Components.Icon (IconType(..), icon_)
+import Lumi.Components.NativeSelect as Select
 import Lumi.Components.Progress (progressBar, progressCircle, progressDefaults)
+import Lumi.Components.Spacing (Space(..), hspace)
 import Lumi.Components.Svg (userSvg)
 import Lumi.Components.Text (body_, nbsp)
+import Lumi.Components2.Box as Box
 import React.Basic.Classic (Component, JSX, createComponent, element, elementKeyed, empty, fragment, make, readProps)
 import React.Basic.DOM as R
 import React.Basic.DOM.Components.GlobalEvents (defaultOptions, globalEvents)
 import React.Basic.DOM.Events (capture, capture_, nativeEvent, preventDefault, stopPropagation, target)
+import React.Basic.DOM.Events (targetValue)
 import React.Basic.Events (EventHandler, handler, handler_)
 import Web.Event.Event (Event, EventType(..))
 import Web.Event.Event as E
@@ -75,17 +80,22 @@ import Web.HTML.HTMLInputElement as HTMLInputElement
 import Web.HTML.Window (document)
 import Web.HTML.Window as Window
 
+import Effect.Console (log)
+import Unsafe.Coerce (unsafeCoerce)
+
 type FileInfo =
   { id :: FileId
   , name :: FileName
   , previewUri :: Maybe URI
   , readonly :: Boolean
+  , type_ :: Maybe String
   }
 
 type PendingFileInfo =
   { name :: FileName
   , previewUri :: Maybe URI
   , progress :: Maybe Progress
+  , type_ :: Maybe String
   }
 
 type Progress =
@@ -148,6 +158,7 @@ defaults =
           , name: FileName name
           , previewUri: Nothing
           , readonly: false
+          , type_: Nothing
           }
       , remove: \_ -> pure true
       , upload: \file -> pure (Right (FileId (File.name file)))
@@ -178,7 +189,7 @@ getPreviewUri file =
 data Action
   = AddNewFiles (Array File)
   | NewPendingFile PendingFileInfo
-  | UpdatePendingFile FileName Progress
+  | UpdatePendingFile FileName (Maybe String) Progress
   | CancelPendingFile PendingFileInfo
   | AddCompleteFiles (Array FileInfo)
   | RemoveCompleteFile FileId
@@ -224,22 +235,23 @@ upload = make component { initialState, render }
             { name
             , previewUri
             , progress: Nothing
+            , type_: Nothing
             }
-          pure { file, name, previewUri, readonly: true }
+          pure { file, name, previewUri, readonly: true, type_: Nothing }
       let
         handlePending name = forever do
           progress <- await
           lift $ liftEffect do
-            send self $ UpdatePendingFile name progress
+            send self $ UpdatePendingFile name Nothing progress
 
         handleCompleteFiles = send self <<< AddCompleteFiles
       runAff_ (either errorShow handleCompleteFiles) do
-        flip parTraverse allowedFiles' \{ file, name, previewUri, readonly } -> do
+        flip parTraverse allowedFiles' \{ file, name, previewUri, readonly, type_ } -> do
           let var = self.props.backend.upload file
           completeFile <- runProcess (var $$ handlePending name)
           case completeFile of
             Left error -> throwError error
-            Right id -> pure { id, name, previewUri, readonly }
+            Right id -> pure { id, name, previewUri, readonly, type_: Nothing }
 
     send self action = do
       unless self.props.readonly do
@@ -250,7 +262,7 @@ upload = make component { initialState, render }
           NewPendingFile pendingFileInfo ->
             self.setState \state -> state { pendingFiles = Array.snoc state.pendingFiles pendingFileInfo }
 
-          UpdatePendingFile name progress -> do
+          UpdatePendingFile name type_ progress -> do
             let
               go existing =
                 case Array.findIndex (\f -> f.name == name) existing of
@@ -258,7 +270,7 @@ upload = make component { initialState, render }
                     existing
                   Just ix ->
                     fromMaybe existing
-                    $ Array.modifyAt ix (_{ progress = Just progress }) existing
+                    $ Array.modifyAt ix (_{ progress = Just progress, type_ = type_ }) existing
             self.setState \state -> state { pendingFiles = go state.pendingFiles }
 
           CancelPendingFile pendingFileInfo -> do
@@ -480,11 +492,30 @@ upload = make component { initialState, render }
                             , if stuff.readonly || value.readonly
                                 then empty
                                 else
-                                  lumiUploadFileRemove
-                                    { onClick: capture_ $ send self $ RemoveCompleteFile value.id
-                                    , children: icon_ Bin
-                                    , style: R.css {}
-                                    }
+                                  Box.row
+                                  $$$
+                                    [ Select.nativeSelect Select.defaults
+                                        { style = R.css { minWidth: "100px" }
+                                        , value =  fromMaybe "" value.type_ 
+                                        -- @TODO need to update the select value + change the pending files doctype
+                                        , onChange =
+                                            handler targetValue \t ->
+                                              -- liftEffect $ log $ unsafeCoerce t
+                                              send self $ UpdatePendingFile value.name t { totalBytes: 0, uploadedBytes: 0 }
+                                          -- @TODO pass in the filetype options
+                                        , options =
+                                            [ { value: "", label: "Select a file type" }
+                                            , { value: "Dieline", label: "Dieline" }
+                                            , { value: "Structural file", label: "Structural file"}
+                                            ]
+                                        }
+                                    , hspace S16
+                                    , lumiUploadFileRemove
+                                        { onClick: capture_ $ send self $ RemoveCompleteFile value.id
+                                        , children: icon_ Bin
+                                        , style: R.css {}
+                                        }
+                                    ]
                             ]
                         }
                   )

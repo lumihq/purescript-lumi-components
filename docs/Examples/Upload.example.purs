@@ -122,6 +122,7 @@ docs = unit # make component { initialState, didMount, render }
                                 , name: FileName name
                                 , previewUri: Nothing
                                 , readonly: false
+                                , type_: Nothing
                                 }
                           , remove: \_ -> pure true
                           , upload: \file -> produceAff \emitter ->
@@ -149,6 +150,7 @@ docs = unit # make component { initialState, didMount, render }
                                 , name: FileName name
                                 , previewUri: Nothing
                                 , readonly: false
+                                , type_: Nothing
                                 }
                           , remove: \_ -> pure true
                           , upload: \file -> produceAff \emitter -> do
@@ -181,6 +183,7 @@ docs = unit # make component { initialState, didMount, render }
                                 , name: FileName name
                                 , previewUri: Nothing
                                 , readonly: false
+                                , type_: Nothing
                                 }
                           , remove: \_ -> pure true
                           , upload: \file -> produceAff \emitter ->
@@ -206,6 +209,7 @@ docs = unit # make component { initialState, didMount, render }
                                 , name: FileName name
                                 , previewUri: Nothing
                                 , readonly: false
+                                , type_: Nothing
                                 }
                           , remove: \_ -> pure true
                           , upload: \file -> produceAff \emitter ->
